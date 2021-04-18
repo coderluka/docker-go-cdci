@@ -1,0 +1,33 @@
+os: linux
+
+language: go
+
+go:
+  - 1.16.x
+
+services:
+  - postgresql
+  - docker
+
+before_script:
+  - psql -c "CREATE DATABASE cdci;" -U postgres
+  - psql -c "CREATE USER luka WITH PASSWORD 'postgres';" -U postgres
+
+env:
+  - APP_DB_HOST=localhost
+  - APP_DB_NAME=cdci
+  - APP_DB_USERNAME=postgres
+  - APP_DB_PASSWORD=postgres
+
+script:
+  # Test the code
+  - go test -v ./...
+
+  # Build the code
+  - CGO_ENABLED=0 GOARCH=amd64 go build -o go-mux
+  - echo "$REGISTRY_PASSWORD" | docker login --username $REGISTRY_USER --password-stdin
+  - docker build -f Dockerfile -t coderluka/docker-go-cdci:latest ./
+  - GIT_SHA="$(git rev-parse --short HEAD)"
+  - docker tag coderluka/docker-go-cdci:latest coderluka/docker-go-cdci:$GIT_SHA
+  - docker push coderluka/docker-go-cdci:latest
+  - docker push coderluka/docker-go-cdci:$GIT_SHA
